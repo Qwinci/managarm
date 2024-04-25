@@ -1,0 +1,5 @@
+{
+    "clangd.path": "/home/visa/Projects/managarm-aarch64/src/scripts/managarm-lsp-launcher.sh",
+    "clangd.arguments": ["/home/visa/Projects/managarm-aarch64/build"],
+    "clangd.onConfigChanged": "restart"
+}

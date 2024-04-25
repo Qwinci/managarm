@@ -72,6 +72,7 @@ struct Controller final : proto::BaseController {
 	virtual ~Controller() = default;
 
 	async::detached initialize();
+	void initializeDwc3();
 	async::detached handleIrqs();
 	async::detached handleMsis();
 

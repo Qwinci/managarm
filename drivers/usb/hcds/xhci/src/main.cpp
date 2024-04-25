@@ -317,6 +317,192 @@ async::detached Controller::initialize() {
 	printf("xhci: init done\n");
 }
 
+namespace dwc3_reg {
+	constexpr arch::bit_register<uint32_t> gctl{0xc110};
+	constexpr arch::bit_register<uint32_t> guctl{0xc12c};
+	constexpr arch::bit_register<uint32_t> ghwparams0{0xc140};
+	constexpr arch::bit_register<uint32_t> gusb2phycfg{0xc200};
+	constexpr arch::bit_register<uint32_t> gusb3pipectl{0xc2c0};
+	constexpr arch::bit_register<uint32_t> ocfg{0xcc00};
+	constexpr arch::bit_register<uint32_t> octl{0xcc04};
+	constexpr arch::scalar_register<uint32_t> oevt{0xcc08};
+	constexpr arch::scalar_register<uint32_t> oevten{0xcc0c};
+
+	constexpr arch::bit_register<uint32_t> hsphyctrl{0xf8810};
+	constexpr arch::bit_register<uint32_t> ssphyctrl{0xf8830};
+}
+
+namespace hsphyctrl {
+	constexpr arch::field<uint32_t, bool> utmi_otg_vbus_valid{20, 1};
+}
+namespace ssphyctrl {
+	constexpr arch::field<uint32_t, bool> lane0_pwr_present{24, 1};
+}
+
+namespace usb2phycfg {
+	constexpr arch::field<uint32_t, bool> phyif{3, 1};
+	constexpr arch::field<uint32_t, bool> susphy{6, 1};
+	constexpr arch::field<uint32_t, bool> enblslpm{8, 1};
+	constexpr arch::field<uint32_t, uint8_t> usbtrdtim{10, 4};
+	constexpr arch::field<uint32_t, bool> u2_freeclk_exists{30, 1};
+	constexpr arch::field<uint32_t, bool> physoftrst{31, 1};
+
+	constexpr bool phyif_16bit = true;
+	constexpr bool phyif_8bit = false;
+	constexpr uint8_t usbtrdtim_8bit = 9;
+	constexpr uint8_t usbtrdtim_16bit = 5;
+}
+
+namespace hwparams0 {
+	constexpr arch::field<uint32_t, uint8_t> mode{0, 2};
+
+	constexpr uint8_t mode_dualrole = 2;
+}
+
+namespace guctl {
+	constexpr arch::field<uint32_t, bool> hostautoretry{14, 1};
+}
+
+#define BIT(index) (1ULL << (index))
+
+#define DWC3_OEVTEN_XHCIRUNSTPSETEN	BIT(27)
+#define DWC3_OEVTEN_DEVRUNSTPSETEN	BIT(26)
+#define DWC3_OEVTEN_HIBENTRYEN		BIT(25)
+#define DWC3_OEVTEN_CONIDSTSCHNGEN	BIT(24)
+#define DWC3_OEVTEN_HRRCONFNOTIFEN	BIT(23)
+#define DWC3_OEVTEN_HRRINITNOTIFEN	BIT(22)
+#define DWC3_OEVTEN_ADEVIDLEEN		BIT(21)
+#define DWC3_OEVTEN_ADEVBHOSTENDEN	BIT(20)
+#define DWC3_OEVTEN_ADEVHOSTEN		BIT(19)
+#define DWC3_OEVTEN_ADEVHNPCHNGEN	BIT(18)
+#define DWC3_OEVTEN_ADEVSRPDETEN	BIT(17)
+#define DWC3_OEVTEN_ADEVSESSENDDETEN	BIT(16)
+#define DWC3_OEVTEN_BDEVBHOSTENDEN	BIT(11)
+#define DWC3_OEVTEN_BDEVHNPCHNGEN	BIT(10)
+#define DWC3_OEVTEN_BDEVSESSVLDDETEN	BIT(9)
+#define DWC3_OEVTEN_BDEVVBUSCHNGEN	BIT(8)
+
+#define DWC3_OTG_ALL_EVENTS	(DWC3_OEVTEN_XHCIRUNSTPSETEN | \
+		DWC3_OEVTEN_DEVRUNSTPSETEN | DWC3_OEVTEN_HIBENTRYEN | \
+		DWC3_OEVTEN_CONIDSTSCHNGEN | DWC3_OEVTEN_HRRCONFNOTIFEN | \
+		DWC3_OEVTEN_HRRINITNOTIFEN | DWC3_OEVTEN_ADEVIDLEEN | \
+		DWC3_OEVTEN_ADEVBHOSTENDEN | DWC3_OEVTEN_ADEVHOSTEN | \
+		DWC3_OEVTEN_ADEVHNPCHNGEN | DWC3_OEVTEN_ADEVSRPDETEN | \
+		DWC3_OEVTEN_ADEVSESSENDDETEN | DWC3_OEVTEN_BDEVBHOSTENDEN | \
+		DWC3_OEVTEN_BDEVHNPCHNGEN | DWC3_OEVTEN_BDEVSESSVLDDETEN | \
+		DWC3_OEVTEN_BDEVVBUSCHNGEN)
+
+void dwc3_otg_disable_events(arch::mem_space& space, uint32_t disable) {
+	auto oevten = space.load(dwc3_reg::oevten);
+	oevten &= ~disable;
+	space.store(dwc3_reg::oevten, oevten);
+}
+
+void dwc3_otg_enable_events(arch::mem_space& space, uint32_t enable) {
+	auto oevten = space.load(dwc3_reg::oevten);
+	oevten |= enable;
+	space.store(dwc3_reg::oevten, oevten);
+}
+
+void dwc3_otg_clear_events(arch::mem_space& space) {
+	auto oevt = space.load(dwc3_reg::oevt);
+	space.store(dwc3_reg::oevten, oevt);
+}
+
+namespace octl {
+	constexpr arch::field<uint32_t, bool> hstsethnpen{0, 1};
+	constexpr arch::field<uint32_t, bool> devsethnpen{1, 1};
+	constexpr arch::field<uint32_t, bool> termselidpulse{2, 1};
+	constexpr arch::field<uint32_t, bool> hnpreq{4, 1};
+	constexpr arch::field<uint32_t, bool> prtpwrctl{5, 1};
+	constexpr arch::field<uint32_t, bool> perimode{6, 1};
+}
+
+namespace ocfg {
+	constexpr arch::field<uint32_t, bool> srpcap{0, 1};
+	constexpr arch::field<uint32_t, bool> hnpcap{1, 1};
+	constexpr arch::field<uint32_t, bool> sftrstmask{3, 1};
+	constexpr arch::field<uint32_t, bool> dispwrcutoff{5, 1};
+}
+
+namespace gctl {
+	constexpr arch::field<uint32_t, bool> gblhibernation{1, 1};
+	constexpr arch::field<uint32_t, bool> coresoftreset{11, 1};
+	constexpr arch::field<uint32_t, uint8_t> prtcapdir{12, 2};
+
+	constexpr uint8_t portcapdir_host = 1;
+	constexpr uint8_t portcapdir_device = 2;
+	constexpr uint8_t portcapdir_otg = 3;
+}
+
+namespace usb3pipectl {
+	constexpr arch::field<uint32_t, bool> susphy{17, 1};
+	constexpr arch::field<uint32_t, bool> uxexitpx{27, 1};
+	constexpr arch::field<uint32_t, bool> physoftrst{31, 1};
+}
+
+void Controller::initializeDwc3() {
+	auto phycfg = _space.load(dwc3_reg::gusb2phycfg);
+	phycfg &= ~usb2phycfg::phyif;
+	phycfg |= usb2phycfg::phyif(usb2phycfg::phyif_8bit);
+	phycfg &= ~usb2phycfg::usbtrdtim;
+	phycfg |= usb2phycfg::usbtrdtim(usb2phycfg::usbtrdtim_8bit);
+	_space.store(dwc3_reg::gusb2phycfg, phycfg);
+
+	auto hwparams0 = _space.load(dwc3_reg::ghwparams0);
+
+	auto gctl = _space.load(dwc3_reg::gctl);
+	gctl |= gctl::coresoftreset(true);
+	_space.store(dwc3_reg::gctl, gctl);
+
+	phycfg = _space.load(dwc3_reg::gusb2phycfg);
+	phycfg |= usb2phycfg::physoftrst(true);
+	if((hwparams0 & hwparams0::mode) == hwparams0::mode_dualrole) {
+		printf("xhci: dwc3 dualrole device detected\n");
+		phycfg &= ~usb2phycfg::susphy;
+	}
+	_space.store(dwc3_reg::gusb2phycfg, phycfg);
+
+	auto pipectl = _space.load(dwc3_reg::gusb3pipectl);
+	pipectl |= usb3pipectl::physoftrst(true);
+	if((hwparams0 & hwparams0::mode) == hwparams0::mode_dualrole) {
+		pipectl &= ~usb3pipectl::susphy;
+	}
+	_space.store(dwc3_reg::gusb3pipectl, pipectl);
+
+	usleep(1000);
+
+	phycfg &= ~usb2phycfg::physoftrst;
+	_space.store(dwc3_reg::gusb2phycfg, phycfg);
+	pipectl &= ~usb3pipectl::physoftrst;
+	_space.store(dwc3_reg::gusb3pipectl, pipectl);
+
+	gctl &= ~gctl::coresoftreset;
+	_space.store(dwc3_reg::gctl, gctl);
+
+	// configure as otg
+	gctl = _space.load(dwc3_reg::gctl);
+	gctl &= ~gctl::prtcapdir;
+	gctl |= gctl::prtcapdir(gctl::portcapdir_otg);
+	_space.store(dwc3_reg::gctl, gctl);
+
+	auto guctl = _space.load(dwc3_reg::guctl);
+	guctl |= guctl::hostautoretry(true);
+	_space.store(dwc3_reg::guctl, guctl);
+
+	phycfg = _space.load(dwc3_reg::gusb2phycfg);
+	phycfg |= usb2phycfg::u2_freeclk_exists(true);
+	phycfg &= ~usb2phycfg::susphy;
+	phycfg &= ~usb2phycfg::enblslpm;
+	_space.store(dwc3_reg::gusb2phycfg, phycfg);
+
+	pipectl = _space.load(dwc3_reg::gusb3pipectl);
+	if((hwparams0 & hwparams0::mode) == hwparams0::mode_dualrole) {
+		pipectl |= usb3pipectl::susphy(true);
+	}
+	_space.store(dwc3_reg::gusb3pipectl, pipectl);
+}
+
 async::detached Controller::handleIrqs() {
 	uint64_t sequence = 0;
 
@@ -1187,6 +1373,22 @@ async::detached bindController(mbus_ng::Entity entity) {
 	globalControllers.push_back(std::move(controller));
 }
 
+async::detached bindDtbController(mbus_ng::Entity entity) {
+	protocols::hw::Device device((co_await entity.getRemoteLane()).unwrap());
+	auto info = co_await device.getDtbInfo();
+	auto reg = co_await device.accessDtbRegister(0);
+
+	helix::UniqueDescriptor irq = co_await device.installDtbIrq(0);
+
+	helix::Mapping mapping{reg, info.regs[0].offset, info.regs[0].length};
+
+	auto controller = std::make_shared<Controller>(std::move(device), std::move(entity), std::move(mapping),
+			std::move(reg), std::move(irq), false);
+	//controller->initializeDwc3();
+	controller->initialize();
+	globalControllers.push_back(std::move(controller));
+}
+
 async::detached observeControllers() {
 	auto filter = mbus_ng::Conjunction{{
 		mbus_ng::EqualsFilter{"pci-class", "0c"},
@@ -1209,6 +1411,26 @@ async::detached observeControllers() {
 	}
 }
 
+async::detached observeDtbControllers() {
+	auto filter = mbus_ng::Conjunction{{
+		mbus_ng::EqualsFilter{"dtb.compatible=snps,dwc3", ""}
+	}};
+
+	auto enumerator = mbus_ng::Instance::global().enumerate(filter);
+	while (true) {
+		auto [_, events] = (co_await enumerator.nextEvents()).unwrap();
+
+		for (auto &event : events) {
+			if (event.type != mbus_ng::EnumerationEvent::Type::created)
+				continue;
+
+			auto entity = co_await mbus_ng::Instance::global().getEntity(event.id);
+			std::cout << "xhci: Detected controller" << std::endl;
+			bindDtbController(std::move(entity));
+		}
+	}
+}
+
 // --------------------------------------------------------
 // main() function
 // --------------------------------------------------------
@@ -1217,6 +1439,7 @@ int main() {
 	printf("xhci: starting driver\n");
 
 	observeControllers();
+	observeDtbControllers();
 	async::run_forever(helix::currentDispatcher);
 }
 

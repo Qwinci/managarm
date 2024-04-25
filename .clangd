@@ -1,0 +1,10 @@
+---
+CompileFlags:
+  CompilationDatabase: /var/lib/managarm-buildenv/build/pkg-builds/managarm-system
+---
+If:
+  PathMatch: kernel/.*
+CompileFlags:
+  CompilationDatabase: /var/lib/managarm-buildenv/build/pkg-builds/managarm-kernel
+
+# vim: set ft=yaml :

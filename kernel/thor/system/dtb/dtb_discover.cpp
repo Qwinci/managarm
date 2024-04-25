@@ -41,11 +41,11 @@ struct DtbNode final : private KernelBusObject {
 
 			regs.emplace_back(
 				reg.addr,
-				reg.size,
+				0x200000,
 				offset,
 				smarter::allocate_shared<HardwareMemory>(*kernelAlloc,
 					reg.addr & ~(kPageSize - 1),
-					(reg.size + (kPageSize - 1)) & ~(kPageSize - 1),
+					(0x200000 + (kPageSize - 1)) & ~(kPageSize - 1),
 					CachingMode::mmioNonPosted)
 			);
 		}

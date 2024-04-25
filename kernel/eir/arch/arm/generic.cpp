@@ -149,7 +149,8 @@ void eirRelocate() {
 
 	uintptr_t eirStart = reinterpret_cast<uintptr_t>(&eirImageFloor);
 	uintptr_t eirEnd = reinterpret_cast<uintptr_t>(&eirImageCeiling);
-	addReservedRegion(eirStart, eirEnd - eirStart);
+	size_t eirSize = (eirEnd - eirStart + 0x7FFFFFF) & ~0x7FFFFFF;
+	addReservedRegion(eirStart, eirSize);
 
 	uintptr_t initrd = 0;
 	if(auto p = chosenNode.findProperty("linux,initrd-start"); p) {
