@@ -126,26 +126,29 @@ elif arch == 'x86_64'
 endif
 
 if want_acpi
+	acpi_prefix = 'system/acpi/' + acpi_impl + '/'
+
 	src += files(
-		'system/acpi/acpi.cpp',
-		'system/acpi/glue.cpp',
-		'system/acpi/madt.cpp',
-		'system/acpi/ec.cpp',
-		'system/acpi/pm-interface.cpp',
-		'system/acpi/battery.cpp',
-		'system/pci/pci_acpi.cpp'
+		acpi_prefix + 'acpi.cpp',
+		acpi_prefix + 'glue.cpp',
+		acpi_prefix + 'madt.cpp',
+		acpi_prefix + 'ec.cpp',
+		acpi_prefix + 'pm-interface.cpp',
+		acpi_prefix + 'battery.cpp',
+		'system/pci/pci_acpi_' + acpi_impl + '.cpp',
 	)
 
 	uacpi_args = [ '-DUACPI_OVERRIDE_LIBC' ]
 
-	uacpi_lib = static_library('uacpi', uacpi_sources,
-		include_directories : [uacpi_includes, 'system/acpi'],
+	acpi_lib = static_library('acpi', acpi_sources,
+		include_directories : [acpi_includes, 'system/acpi'],
 		c_args : c_args + args,
+		cpp_args : cpp_args + args,
 		pic : false
 	)
 
-	inc += uacpi_includes
-	link_with += uacpi_lib
+	inc += acpi_includes
+	link_with += acpi_lib
 endif
 
 link_with += static_library('cralgo', cralgo_sources,

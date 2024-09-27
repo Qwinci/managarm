@@ -97,6 +97,7 @@ server = get_option('libdir')/'managarm/server'
 kasan = get_option('kernel_kasan')
 ubsan = get_option('kernel_ubsan')
 log_alloc = get_option('kernel_log_allocations')
+acpi_impl = get_option('kernel_acpi_impl')
 frame_pointers = get_option('kernel_frame_pointers')
 
 supported_archs = [
@@ -157,8 +158,14 @@ if build_kernel
 	libasync = subproject('libasync', default_options : [ 'install_headers=false' ])
 	cralgo_sources = cralgo.get_variable('sources')
 	cralgo_includes = cralgo.get_variable('includes')
-	uacpi_sources = uacpi.get_variable('sources')
-	uacpi_includes = uacpi.get_variable('includes')
+	acpi_includes = [uacpi.get_variable('includes')]
+
+	if acpi_impl == 'uacpi'
+		acpi_sources = uacpi.get_variable('sources')
+	else
+		error('unsupported acpi impl')
+	endif
+
 	libasync_dep = libasync.get_variable('libasync_dep')
 
 	subdir('hel')

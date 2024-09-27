@@ -13,7 +13,7 @@ eir_includes = [include_directories(
 	'../common',
 	'generic')]
 
-eir_includes += uacpi_includes
+eir_includes += acpi_includes
 
 cxx = meson.get_compiler('cpp')
 libgcc = cxx.find_library('gcc')

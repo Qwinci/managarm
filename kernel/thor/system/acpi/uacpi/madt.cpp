@@ -79,6 +79,14 @@ struct [[gnu::packed]] MadtLocalNmiEntry {
 	uint8_t localInt;
 };
 
+void *getTable(const char *signature, size_t index) {
+	uacpi_table table;
+	auto status = uacpi_table_find_by_signature(signature, &table);
+	if(status != UACPI_STATUS_OK)
+		return nullptr;
+	return table.ptr;
+}
+
 } } // namespace thor::acpi
 
 // --------------------------------------------------------

@@ -36,6 +36,13 @@ option('kernel_log_allocations',
     description : 'enable memory allocation logging in kernel'
 )
 
+option('kernel_acpi_impl',
+    type : 'combo',
+    choices : ['uacpi'],
+    value : 'uacpi',
+    description : 'the acpi implementation to use in the kernel'
+)
+
 option('build_docs', 
     type : 'boolean', 
     value : false,

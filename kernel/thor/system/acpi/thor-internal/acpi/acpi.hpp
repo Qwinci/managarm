@@ -3,7 +3,7 @@
 #include <thor-internal/irq.hpp>
 #include <thor-internal/stream.hpp>
 #include <thor-internal/mbus.hpp>
-#include <uacpi/uacpi.h>
+#include <uacpi/acpi.h>
 #include <initgraph.hpp>
 
 namespace thor {
@@ -38,6 +38,8 @@ initgraph::Stage *getAcpiWorkqueueAvailableStage();
 void initGlue();
 void initEc();
 void initEvents();
+
+void *getTable(const char *signature, size_t index = 0);
 
 struct AcpiObject final : public KernelBusObject {
 	AcpiObject(uacpi_namespace_node *node, const char *hid, unsigned int id)
