@@ -42,14 +42,14 @@ void initEvents();
 void *getTable(const char *signature, size_t index = 0);
 
 struct AcpiObject final : public KernelBusObject {
-	AcpiObject(uacpi_namespace_node *node, const char *hid, unsigned int id)
+	AcpiObject(void *node, const char *hid, unsigned int id)
 	: node{node}, hid_name{hid}, instance{id} {}
 
 	coroutine<void> run();
 	coroutine<frg::expected<Error>> handleRequest(LaneHandle lane) override;
 
 	size_t mbus_id;
-	uacpi_namespace_node *node;
+	void *node;
 	const char *hid_name;
 	unsigned int instance;
 };

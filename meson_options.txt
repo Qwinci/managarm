@@ -38,7 +38,7 @@ option('kernel_log_allocations',
 
 option('kernel_acpi_impl',
     type : 'combo',
-    choices : ['uacpi'],
+    choices : ['uacpi', 'qacpi'],
     value : 'uacpi',
     description : 'the acpi implementation to use in the kernel'
 )

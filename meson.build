@@ -162,6 +162,26 @@ if build_kernel
 
 	if acpi_impl == 'uacpi'
 		acpi_sources = uacpi.get_variable('sources')
+	elif acpi_impl == 'qacpi'
+		acpi_sources = files(
+			'qacpi/src/interpreter.cpp',
+			'qacpi/src/context.cpp',
+			'qacpi/src/ops.cpp',
+			'qacpi/src/string.cpp',
+			'qacpi/src/buffer.cpp',
+			'qacpi/src/ns.cpp',
+			'qacpi/src/sync.cpp',
+			'qacpi/src/handlers.cpp',
+			'qacpi/src/utils.cpp',
+			'qacpi/src/logger.cpp',
+			'qacpi/src/op_region.cpp',
+			'qacpi/src/resources.cpp',
+			'qacpi/src/event.cpp',
+		)
+		acpi_includes += include_directories(
+			'qacpi/generated',
+			'qacpi/include'
+		)
 	else
 		error('unsupported acpi impl')
 	endif
