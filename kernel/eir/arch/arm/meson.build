@@ -4,4 +4,5 @@ eir_cpp_args += ['-mgeneral-regs-only', '-mno-unaligned-access']
 eir_c_args += ['-mgeneral-regs-only', '-mno-unaligned-access']
 
 subdir('raspi4')
+subdir('raspi5')
 subdir('virt')

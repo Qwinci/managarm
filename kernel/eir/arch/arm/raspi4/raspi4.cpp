@@ -24,8 +24,10 @@ namespace eir {
 
 #if defined(RASPI3)
 static constexpr inline uintptr_t mmioBase = 0x3f000000;
-#elif defined (LOW_PERIPH)
+#elif defined(LOW_PERIPH)
 static constexpr inline uintptr_t mmioBase = 0xfe000000;
+#elif defined(RASPI5)
+static constexpr inline uintptr_t mmioBase = 0x107c008000;
 #else
 static constexpr inline uintptr_t mmioBase = 0x47e000000;
 #endif
@@ -39,6 +41,7 @@ namespace Gpio {
 	static constexpr arch::mem_space space{mmioBase + 0x200000};
 
 	void configUart0Gpio() {
+#ifndef RASPI5
 		arch::field<uint32_t, uint8_t> sel1_p14{12, 3};
 		arch::field<uint32_t, uint8_t> sel1_p15{15, 3};
 
@@ -49,6 +52,7 @@ namespace Gpio {
 		space.store(reg::sel1, space.load(reg::sel1) / sel1_p14(4) / sel1_p15(4));
 		// No pull up/down
 		space.store(reg::pup_pdn0, space.load(reg::pup_pdn0) / pup_pdn0_p14(0) / pup_pdn0_p15(0));
+#endif
 	}
 }
 
@@ -191,7 +195,7 @@ namespace PropertyMbox {
 
 		// if depth is not the expected depth, pretend we failed
 		if(ptr[20] == bpp) { // depth == expected depth
-#ifndef RASPI3
+#if !defined(RASPI3) && !defined(RASPI5)
 			// Translate legacy master view address into our address space
 			fbPtr = ptr[28] - 0xC0000000;
 #else
@@ -246,20 +250,33 @@ extern "C" [[noreturn]] void eirRaspi4Main(uintptr_t deviceTreePtr) {
 	// the device tree pointer is 32-bit and the upper bits are undefined
 	deviceTreePtr &= 0x00000000FFFFFFFF;
 
+#ifndef RASPI5
 	debugUart.initialize(mmioBase + 0x201000, 4000000);
 	debugUart->disable();
 	Gpio::configUart0Gpio();
-	PropertyMbox::setClockFreq(PropertyMbox::Clock::uart, 4000000);
+#else
+	debugUart.initialize(0x107d001000, 9216000);
+	debugUart->disable();
+#endif
+	//PropertyMbox::setClockFreq(PropertyMbox::Clock::uart, 4000000);
 	debugUart->init(115200);
 
+#ifndef RASPI5
 	char cmd_buf[1024];
 	size_t cmd_len = PropertyMbox::getCmdline<1024>(cmd_buf);
+#else
+	char cmd_buf[1024] = {};
+	size_t cmd_len = 0;
+#endif
 
 	frg::string_view cmd_sv{cmd_buf, cmd_len};
 	eir::infoLogger() << "Got cmdline: " << cmd_sv << frg::endlog;
 
 	eir::infoLogger() << "Attempting to set up a framebuffer:" << frg::endlog;
 	unsigned int fb_width = 0, fb_height = 0;
+
+	fb_width = 1080;
+	fb_height = 1920;
 
 	// Parse the command line.
 	{

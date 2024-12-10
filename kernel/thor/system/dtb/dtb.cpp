@@ -174,6 +174,12 @@ void DeviceTreeNode::initializeWith(::DeviceTreeNode dtNode) {
 					j += childAddrCells * 4;
 				}
 
+				if(parentAddrCells >= 3) {
+					infoLogger() << "thor: Skipping range because of too many address cells" << frg::endlog;
+					j += parentAddrCells * 4;
+					j += sizeCells * 4;
+					continue;
+				}
 				assert(parentAddrCells < 3);
 				reg.parentAddr = prop.asPropArrayEntry(parentAddrCells, j);
 				j += parentAddrCells * 4;
@@ -453,9 +459,10 @@ uint64_t DeviceTreeNode::translateAddress(uint64_t addr) const {
 		if (addr >= tr.childAddr && addr <= (tr.childAddr + tr.size))
 			return tr.parentAddr + (addr - tr.childAddr);
 
-	panicLogger() << "thor: address " << (void *)addr
+	infoLogger() << "thor: address " << (void *)addr
 		<< " doesn't fall into any of \""
 		<< path() << "\"'s memory ranges" << frg::endlog;
+	return addr;
 	__builtin_unreachable();
 }
 
