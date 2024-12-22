@@ -2,7 +2,7 @@
 
 #include <helix/ipc.hpp>
 #include <smarter.hpp>
-#include <map>
+#include <vector>
 
 class Ip4Packet;
 
@@ -20,9 +20,10 @@ struct Tcp4Socket;
 struct Tcp4 {
 	void feedDatagram(smarter::shared_ptr<const Ip4Packet>);
 	bool tryBind(Tcp4Socket *socket, TcpEndpoint ipAddress);
-	bool unbind(TcpEndpoint remote);
+	bool unbind(Tcp4Socket *socket);
 	void serveSocket(int flags, helix::UniqueLane lane);
 
 private:
-	std::map<TcpEndpoint, Tcp4Socket *> binds;
+	std::vector<std::pair<TcpEndpoint, Tcp4Socket *>> binds;
+
 };
