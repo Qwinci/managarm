@@ -98,6 +98,7 @@ enum CntReqType {
 	PT_RECVMSG = 33,
 	PT_SENDMSG = 34,
 	PT_PEERNAME = 42,
+	PT_ACCEPT = 51,
 
 	WRITE = 3,
 	SEEK_ABS = 6,

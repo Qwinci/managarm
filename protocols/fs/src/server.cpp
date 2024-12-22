@@ -863,6 +863,54 @@ async::detached handlePassthrough(smarter::shared_ptr<void> file,
 			helix_ng::sendBuffer(ser.data(), ser.size())
 		);
 		HEL_CHECK(send_resp.error());
+	}else if(req.req_type() == managarm::fs::CntReqType::PT_ACCEPT) {
+		if(!file_ops->accept) {
+			managarm::fs::SvrResponse resp;
+			resp.set_error(managarm::fs::Errors::ILLEGAL_OPERATION_TARGET);
+
+			auto ser = resp.SerializeAsString();
+			auto [send_resp] = co_await helix_ng::exchangeMsgs(
+				conversation,
+				helix_ng::sendBuffer(ser.data(), ser.size())
+			);
+			HEL_CHECK(send_resp.error());
+			co_return;
+		}
+
+		auto result = co_await file_ops->accept(file.get());
+
+		managarm::fs::SvrResponse resp;
+		if(result) {
+			resp.set_error(managarm::fs::Errors::SUCCESS);
+
+			auto ser = resp.SerializeAsString();
+			auto [send_resp, send_lane] = co_await helix_ng::exchangeMsgs(
+				conversation,
+				helix_ng::sendBuffer(ser.data(), ser.size()),
+				helix_ng::pushDescriptor(result.value())
+			);
+			HEL_CHECK(send_resp.error());
+			HEL_CHECK(send_lane.error());
+		}else {
+			switch(result.error()) {
+			case Error::illegalOperationTarget:
+				resp.set_error(managarm::fs::Errors::ILLEGAL_OPERATION_TARGET);
+				break;
+			case Error::wouldBlock:
+				resp.set_error(managarm::fs::Errors::WOULD_BLOCK);
+				break;
+			default:
+				assert(!"unhandled error in PT_ACCEPT");
+				break;
+			}
+
+			auto ser = resp.SerializeAsString();
+			auto [send_resp] = co_await helix_ng::exchangeMsgs(
+				conversation,
+				helix_ng::sendBuffer(ser.data(), ser.size())
+			);
+			HEL_CHECK(send_resp.error());
+		}
 	} else if (req.req_type() == managarm::fs::CntReqType::PT_ADD_SEALS) {
 		managarm::fs::SvrResponse resp;
 		resp.set_error(managarm::fs::Errors::SUCCESS);
