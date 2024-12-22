@@ -192,6 +192,17 @@ struct Tcp4Socket {
 		parent_->unbind(localEp_);
 	}
 
+	async::result<void> disconnect() {
+		if(localClosed_)
+			co_return;
+
+		localClosed_ = true;
+		flushEvent_.raise();
+
+		while (localSettledSn_ < localFlushedSn_)
+			co_await settleEvent_.async_wait();
+	}
+
 	static auto makeSocket(Tcp4 *parent, bool nonBlock) {
 		auto s = smarter::make_shared<Tcp4Socket>(parent, nonBlock);
 		async::detach(s->flushOutPackets_());
@@ -364,6 +375,9 @@ struct Tcp4Socket {
 		auto self = static_cast<Tcp4Socket *>(object);
 		auto p = reinterpret_cast<char *>(data);
 
+		if(self->remoteClosed_)
+			co_return protocols::fs::RecvData{{}, 0, sizeof(struct sockaddr_in), 0};
+
 		if(flags & ~MSG_PEEK)
 			std::cout << "\e[31m" "netserver/tcp: Encountered unexpected recvMsg() flags: "
 					<< flags << "\e[39m" << std::endl;
@@ -410,6 +424,9 @@ struct Tcp4Socket {
 
 		auto self = static_cast<Tcp4Socket *>(object);
 		auto p = reinterpret_cast<char *>(data);
+
+		if(self->localClosed_)
+			co_return protocols::fs::Error::brokenPipe;
 
 		size_t progress = 0;
 		while(progress < size) {
@@ -572,6 +589,7 @@ private:
 
 	ConnectState connectState_ = ConnectState::none;
 	bool remoteClosed_ = false;
+	bool localClosed_ = false;
 
 	// Out-SN corresponding to the front of sendRing_.
 	uint32_t localSettledSn_ = 0;
@@ -688,6 +706,54 @@ async::result<void> Tcp4Socket::flushOutPackets_() {
 			bool wantData = (bytesAvailable > flushPointer && windowPointer > flushPointer);
 			bool wantAck = (remoteAckedSn_ != remoteKnownSn_);
 			bool wantWindowUpdate = (announcedWindow_ < recvRing_.spaceForEnqueue());
+
+			// Send FIN packet if all queued data is transmitted and the local end is closed.
+			if(!wantData && localClosed_) {
+				std::vector<char> buf;
+				buf.resize(sizeof(TcpHeader));
+
+				auto header = new (buf.data()) TcpHeader {
+					.srcPort = localEp_.port,
+					.destPort = remoteEp_.port,
+					.seqNumber = remoteKnownSn_,
+					.flags = {},
+					.window = std::min(recvRing_.spaceForEnqueue(), size_t{0xFFFF}),
+					.checksum = 0,
+					.urgentPointer = 0
+				};
+				header->flags.store(TcpHeader::headerWords(sizeof(TcpHeader) / 4)
+						| TcpHeader::ackFlag(true)
+						| TcpHeader::finFlag(true));
+
+				// Fill in the checksum.
+				PseudoHeader pseudo {
+					.src = targetInfo->source,
+					.dst = remoteEp_.ipAddress,
+					.len = buf.size()
+				};
+				Checksum csum;
+				csum.update(&pseudo, sizeof(PseudoHeader));
+				csum.update(buf.data(), buf.size());
+				header->checksum = csum.finalize();
+
+				localFlushedSn_ += 1;
+				remoteAckedSn_ = remoteKnownSn_;
+				announcedWindow_ = recvRing_.spaceForEnqueue();
+
+				if(debugTcp)
+					std::cout << "netserver: Sending TCP FIN" << std::endl;
+				auto error = co_await ip4().sendFrame(std::move(*targetInfo),
+					buf.data(), buf.size(),
+					static_cast<uint16_t>(IpProto::tcp));
+				if (error != protocols::fs::Error::none) {
+					// TODO: Return an error to users.
+					std::cout << "netserver: Could not send TCP packet" << std::endl;
+					co_return;
+				}
+
+				co_await flushEvent_.async_wait();
+				continue;
+			}
 
 			if(!wantData && !wantAck && !wantWindowUpdate) {
 				co_await flushEvent_.async_wait();
@@ -874,9 +940,14 @@ bool Tcp4::unbind(TcpEndpoint e) {
 	return binds.erase(e) != 0;
 }
 
+static async::result<void> servePassthrough(
+    helix::UniqueLane lane,
+    smarter::shared_ptr<Tcp4Socket> sock) {
+	co_await protocols::fs::servePassthrough(std::move(lane), sock, &Tcp4Socket::ops);
+	co_await sock->disconnect();
+}
+
 void Tcp4::serveSocket(int flags, helix::UniqueLane lane) {
-	using protocols::fs::servePassthrough;
 	auto sock = Tcp4Socket::makeSocket(this, flags & SOCK_NONBLOCK);
-	async::detach(servePassthrough(std::move(lane), std::move(sock),
-			&Tcp4Socket::ops));
+	async::detach(servePassthrough(std::move(lane), std::move(sock)));
 }

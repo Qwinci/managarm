@@ -92,6 +92,11 @@ struct Socket : File {
 		co_return File::constructHandle(file);
 	}
 
+	void handleClose() override {
+		// Close the control lane to inform the server that we closed the file.
+		_file = protocols::fs::File {{}};
+	}
+
 	helix::BorrowedDescriptor getPassthroughLane() override {
 		return _file.getLane();
 	}
