@@ -194,7 +194,6 @@ struct Tcp4Socket {
 
 	static auto makeSocket(Tcp4 *parent, bool nonBlock) {
 		auto s = smarter::make_shared<Tcp4Socket>(parent, nonBlock);
-		s->holder_ = s;
 		async::detach(s->flushOutPackets_());
 		return s;
 	}
@@ -230,7 +229,7 @@ struct Tcp4Socket {
 				std::cout << "netserver: No source port" << std::endl;
 				co_return protocols::fs::Error::addressInUse;
 			}
-		} else if (!self->parent_->tryBind(self->holder_.lock(), bindEp)) {
+		} else if (!self->parent_->tryBind(self, bindEp)) {
 			co_return protocols::fs::Error::addressInUse;
 		}
 
@@ -543,10 +542,9 @@ struct Tcp4Socket {
 		};
 		auto number = dist(globalPrng);
 		auto range = dist.b() - dist.a();
-		auto self = holder_.lock();
 		for (int i = 0; i < range; i++) {
 			uint16_t port = dist.a() + ((number + i) % range);
-			if (parent_->tryBind(self, { ipAddress, port }))
+			if (parent_->tryBind(this, { ipAddress, port }))
 				return true;
 		}
 		return false;
@@ -571,7 +569,6 @@ private:
 	bool nonBlock_;
 	TcpEndpoint remoteEp_;
 	TcpEndpoint localEp_;
-	smarter::weak_ptr<Tcp4Socket> holder_;
 
 	ConnectState connectState_ = ConnectState::none;
 	bool remoteClosed_ = false;
@@ -859,7 +856,7 @@ void Tcp4::feedDatagram(smarter::shared_ptr<const Ip4Packet> packet) {
 	}
 }
 
-bool Tcp4::tryBind(smarter::shared_ptr<Tcp4Socket> socket, TcpEndpoint wantedEp) {
+bool Tcp4::tryBind(Tcp4Socket *socket, TcpEndpoint wantedEp) {
 	auto it = binds.lower_bound(wantedEp);
 	for (; it != binds.end() && it->first.port == wantedEp.port; it++) {
 		auto existingEp = it->first;
@@ -869,7 +866,7 @@ bool Tcp4::tryBind(smarter::shared_ptr<Tcp4Socket> socket, TcpEndpoint wantedEp)
 		}
 	}
 	socket->localEp_ = wantedEp;
-	binds.emplace(wantedEp, std::move(socket));
+	binds.emplace(wantedEp, socket);
 	return true;
 }
 
