@@ -419,13 +419,14 @@ async::detached serve(helix::UniqueLane lane) {
 
 			if (req.req_type() == managarm::fs::CntReqType::CREATE_SOCKET) {
 				auto [local_lane, remote_lane] = helix::createStream();
+				auto [local_ctrl, remote_ctrl] = helix::createStream();
 
 				managarm::fs::SvrResponse resp;
 				resp.set_error(managarm::fs::Errors::SUCCESS);
 
 				if(req.domain() == AF_INET) {
 					auto err = ip4().serveSocket(std::move(local_lane),
-							req.type(), req.protocol(), req.flags());
+							std::move(local_ctrl), req.type(), req.protocol(), req.flags());
 					if(err != managarm::fs::Errors::SUCCESS) {
 						co_await sendError(err);
 						continue;
@@ -448,15 +449,17 @@ async::detached serve(helix::UniqueLane lane) {
 				}
 
 				auto ser = resp.SerializeAsString();
-				auto [send_resp, push_socket] =
+				auto [send_resp, push_socket, push_ctrl] =
 					co_await helix_ng::exchangeMsgs(
 						conversation,
 						helix_ng::sendBuffer(
 							ser.data(), ser.size()),
-						helix_ng::pushDescriptor(remote_lane)
+						helix_ng::pushDescriptor(remote_lane),
+						helix_ng::pushDescriptor(remote_ctrl)
 					);
 				HEL_CHECK(send_resp.error());
 				HEL_CHECK(push_socket.error());
+				HEL_CHECK(push_ctrl.error());
 			} else {
 				std::cout << "netserver: received unknown request type: "
 					<< (int32_t)req.req_type() << std::endl;

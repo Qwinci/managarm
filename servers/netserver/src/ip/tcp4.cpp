@@ -186,6 +186,7 @@ protocols::fs::Error checkAddress(const void *addrPtr, size_t addrLength, TcpEnd
 
 static async::result<void> servePassthrough(
     helix::UniqueLane lane,
+	helix::UniqueLane ctrl,
     smarter::shared_ptr<Tcp4Socket> sock);
 
 struct Tcp4Socket {
@@ -364,7 +365,7 @@ struct Tcp4Socket {
 		co_return protocols::fs::Error::none;
 	}
 
-	static async::result<frg::expected<protocols::fs::Error, helix::UniqueLane>> accept(void *object) {
+	static async::result<frg::expected<protocols::fs::Error, protocols::fs::AcceptResult>> accept(void *object) {
 		auto self = static_cast<Tcp4Socket *>(object);
 
 		if(self->pendingConnections_.empty()) {
@@ -380,6 +381,7 @@ struct Tcp4Socket {
 		self->pendingConnections_.erase(self->pendingConnections_.begin());
 
 		auto [localLane, remoteLane] = helix::createStream();
+		auto [localCtrl, remoteCtrl] = helix::createStream();
 
 		auto sock = Tcp4Socket::makeSocket(self->parent_, 0);
 
@@ -408,9 +410,9 @@ struct Tcp4Socket {
 			co_await sock->settleEvent_.async_wait();
 		}
 
-		async::detach(servePassthrough(std::move(localLane), std::move(sock)));
+		async::detach(servePassthrough(std::move(localLane), std::move(localCtrl), std::move(sock)));
 
-		co_return std::move(remoteLane);
+		co_return std::make_pair(std::move(remoteLane), std::move(remoteCtrl));
 	}
 
 	static async::result<protocols::fs::ReadResult> read(void *object, const char *creds,
@@ -1175,12 +1177,19 @@ bool Tcp4::unbind(Tcp4Socket *socket) {
 
 static async::result<void> servePassthrough(
     helix::UniqueLane lane,
+	helix::UniqueLane ctrl,
     smarter::shared_ptr<Tcp4Socket> sock) {
-	co_await protocols::fs::servePassthrough(std::move(lane), sock, &Tcp4Socket::ops);
+	async::cancellation_event cancel_pt;
+	async::detach(protocols::fs::serveFile(std::move(ctrl),
+			sock.get(), &Tcp4Socket::ops), [&] {
+		cancel_pt.cancel();
+	});
+
+	co_await protocols::fs::servePassthrough(std::move(lane), sock, &Tcp4Socket::ops, cancel_pt);
 	co_await sock->disconnect();
 }
 
-void Tcp4::serveSocket(int flags, helix::UniqueLane lane) {
+void Tcp4::serveSocket(int flags, helix::UniqueLane lane, helix::UniqueLane ctrl) {
 	auto sock = Tcp4Socket::makeSocket(this, flags & SOCK_NONBLOCK);
-	async::detach(servePassthrough(std::move(lane), std::move(sock)));
+	async::detach(servePassthrough(std::move(lane), std::move(ctrl), std::move(sock)));
 }

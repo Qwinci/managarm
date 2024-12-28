@@ -21,7 +21,7 @@ struct Tcp4 {
 	void feedDatagram(smarter::shared_ptr<const Ip4Packet>);
 	bool tryBind(Tcp4Socket *socket, TcpEndpoint ipAddress);
 	bool unbind(Tcp4Socket *socket);
-	void serveSocket(int flags, helix::UniqueLane lane);
+	void serveSocket(int flags, helix::UniqueLane lane, helix::UniqueLane ctrl);
 
 private:
 	std::vector<std::pair<TcpEndpoint, Tcp4Socket *>> binds;

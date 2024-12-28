@@ -5,9 +5,9 @@
 
 namespace {
 struct Socket : File {
-	Socket(helix::UniqueLane sockLane)
+	Socket(helix::UniqueLane control, helix::UniqueLane sockLane)
 	: File{StructName::get("extern-socket")},
-		_file{std::move(sockLane)} { }
+		_control{std::move(control)}, _file{std::move(sockLane)} { }
 
 	async::result<frg::expected<Error, PollWaitResult>>
 	pollWait(Process *, uint64_t sequence, int mask,
@@ -62,11 +62,12 @@ struct Socket : File {
 		auto req_data = req.SerializeAsString();
 		char buffer[128];
 
-		auto [offer, send_req, recv_resp, recv_lane] = co_await helix_ng::exchangeMsgs(
+		auto [offer, send_req, recv_resp, recv_lane, recv_ctrl] = co_await helix_ng::exchangeMsgs(
 			getPassthroughLane(),
 			helix_ng::offer(
 				helix_ng::sendBuffer(req_data.data(), req_data.size()),
 				helix_ng::recvBuffer(buffer, sizeof(buffer)),
+				helix_ng::pullDescriptor(),
 				helix_ng::pullDescriptor()
 			)
 		);
@@ -84,17 +85,18 @@ struct Socket : File {
 			co_return Error::wouldBlock;
 		default:
 			HEL_CHECK(recv_lane.error());
+			HEL_CHECK(recv_ctrl.error());
 			assert(resp.error() == managarm::fs::Errors::SUCCESS);
 		}
 
-		auto file = smarter::make_shared<Socket>(recv_lane.descriptor());
+		auto file = smarter::make_shared<Socket>(recv_ctrl.descriptor(), recv_lane.descriptor());
 		file->setupWeakFile(file);
 		co_return File::constructHandle(file);
 	}
 
 	void handleClose() override {
 		// Close the control lane to inform the server that we closed the file.
-		_file = protocols::fs::File {{}};
+		_control = helix::UniqueLane{};
 	}
 
 	helix::BorrowedDescriptor getPassthroughLane() override {
@@ -102,6 +104,7 @@ struct Socket : File {
 	}
 
 private:
+	helix::UniqueLane _control;
 	protocols::fs::File _file;
 };
 }
@@ -120,11 +123,12 @@ async::result<smarter::shared_ptr<File, FileHandle>> createSocket(helix::Borrowe
 	auto req_data = req.SerializeAsString();
 	char buffer[128];
 
-	auto [offer, send_req, recv_resp, recv_lane] = co_await helix_ng::exchangeMsgs(
+	auto [offer, send_req, recv_resp, recv_lane, recv_ctrl] = co_await helix_ng::exchangeMsgs(
 		lane,
 		helix_ng::offer(
 			helix_ng::sendBuffer(req_data.data(), req_data.size()),
 			helix_ng::recvBuffer(buffer, sizeof(buffer)),
+			helix_ng::pullDescriptor(),
 			helix_ng::pullDescriptor()
 		)
 	);
@@ -132,12 +136,13 @@ async::result<smarter::shared_ptr<File, FileHandle>> createSocket(helix::Borrowe
 	HEL_CHECK(send_req.error());
 	HEL_CHECK(recv_resp.error());
 	HEL_CHECK(recv_lane.error());
+	HEL_CHECK(recv_ctrl.error());
 
 	managarm::fs::SvrResponse resp;
 	resp.ParseFromArray(buffer, recv_resp.actualLength());
 	assert(resp.error() == managarm::fs::Errors::SUCCESS);
 
-	auto file = smarter::make_shared<Socket>(recv_lane.descriptor());
+	auto file = smarter::make_shared<Socket>(recv_ctrl.descriptor(), recv_lane.descriptor());
 	file->setupWeakFile(file);
 	co_return File::constructHandle(file);
 }

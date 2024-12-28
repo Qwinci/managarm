@@ -881,16 +881,20 @@ async::detached handlePassthrough(smarter::shared_ptr<void> file,
 
 		managarm::fs::SvrResponse resp;
 		if(result) {
+			auto [lane, ctrl] = std::move(result.value());
+
 			resp.set_error(managarm::fs::Errors::SUCCESS);
 
 			auto ser = resp.SerializeAsString();
-			auto [send_resp, send_lane] = co_await helix_ng::exchangeMsgs(
+			auto [send_resp, send_lane, send_ctrl] = co_await helix_ng::exchangeMsgs(
 				conversation,
 				helix_ng::sendBuffer(ser.data(), ser.size()),
-				helix_ng::pushDescriptor(result.value())
+				helix_ng::pushDescriptor(lane),
+				helix_ng::pushDescriptor(ctrl)
 			);
 			HEL_CHECK(send_resp.error());
 			HEL_CHECK(send_lane.error());
+			HEL_CHECK(send_ctrl.error());
 		}else {
 			switch(result.error()) {
 			case Error::illegalOperationTarget:
