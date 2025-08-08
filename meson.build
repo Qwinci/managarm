@@ -212,7 +212,7 @@ if build_drivers or provide_deps
 		# libraries
 		'libblockfs', 'libevbackend',
 		# storage
-		'block/ata', 'block/virtio-blk', 'block/ahci', 'block/nvme',
+		'block/ata', 'block/virtio-blk', 'block/ahci', 'block/nvme', 'block/ufs',
 		# net
 		'nic/usb_net', 'nic/rtl8168', 'nic/freebsd-e1000',
 		# gfx

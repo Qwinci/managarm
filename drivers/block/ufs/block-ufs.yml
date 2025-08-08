@@ -1,0 +1,5 @@
+name: block-ufs
+exec: /usr/bin/block-ufs
+files:
+  - /usr/bin/block-ufs
+

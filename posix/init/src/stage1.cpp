@@ -226,6 +226,11 @@ int main() {
 		execl("/usr/bin/runsvr", "/usr/bin/runsvr", "runsvr", "/usr/bin/storage", nullptr);
 	}else assert(block_usb != -1);
 
+	auto block_ufs = fork();
+	if(!block_ufs) {
+		execl("/usr/bin/runsvr", "/usr/bin/runsvr", "runsvr", "/usr/bin/block-ufs", nullptr);
+	}else assert(block_ufs != -1);
+
 	Cmdline cmdlineHelper{};
 	auto cmdline = async::run(cmdlineHelper.get(), helix::currentDispatcher);
 
