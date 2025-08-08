@@ -85,6 +85,22 @@ struct ReportLuns {
 	uint8_t control;
 };
 
+struct RequestSense {
+	uint8_t opCode;
+	uint8_t reserved[3];
+	uint8_t allocationLength;
+	uint8_t control;
+};
+
+struct ReadCapacity16 {
+	uint8_t opCode;
+	uint8_t serviceAction;
+	uint8_t lba[8];
+	uint8_t allocationLength[4];
+	uint8_t reserved;
+	uint8_t control;
+};
+
 Error statusToError(uint8_t status) {
 	switch (status) {
 	case 0:
@@ -180,6 +196,50 @@ async::result<frg::expected<Error, std::vector<uint64_t>>> Interface::reportLuns
 	co_return data;
 }
 
+async::result<frg::expected<Error, std::vector<uint8_t>>> Interface::requestSense() {
+	RequestSense command{};
+	command.opCode = 3;
+	command.allocationLength = 32;
+
+	std::vector<uint8_t> data(32);
+
+	CommandInfo info{
+		.command{nullptr, &command, sizeof(command)},
+		.data{nullptr, data.data(), data.size()},
+		.isWrite = false
+	};
+	auto result = co_await sendScsiCommand(info);
+	if (!result) {
+		co_return result.error();
+	}
+
+	co_return data;
+}
+
+async::result<frg::expected<Error, CapabilityData>> Interface::readCapacity() {
+	ReadCapacity16 command{};
+	command.opCode = 0x9e;
+	command.serviceAction = 0x10;
+	command.allocationLength[3] = sizeof(CapabilityData);
+
+	CapabilityData data{};
+
+	CommandInfo info{
+		.command{nullptr, &command, sizeof(command)},
+		.data{nullptr, &data, sizeof(data)},
+		.isWrite = false
+	};
+	auto result = co_await sendScsiCommand(info);
+	if (!result) {
+		co_return result.error();
+	}
+
+	data.lastAddressableLba = std::byteswap(data.lastAddressableLba);
+	data.logicalBlockSize = std::byteswap(data.logicalBlockSize);
+
+	co_return data;
+}
+
 async::detached StorageDevice::runScsi() {
 	while (true) {
 		if (queue_.empty()) {
@@ -195,7 +255,7 @@ async::detached StorageDevice::runScsi() {
 		assert(req->numSectors <= 0xffff);
 
 		uint8_t commandData[16];
-		uint8_t commandLength;
+		uint8_t commandLength = 0;
 
 		if (!req->isWrite) {
 			if (enableRead6 && req->sector <= 0x1fffff && req->numSectors <= 0xff) {

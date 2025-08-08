@@ -37,6 +37,13 @@ struct CommandInfo {
 	bool isWrite;
 };
 
+struct CapabilityData {
+	uint64_t lastAddressableLba;
+	uint32_t logicalBlockSize;
+	uint8_t info[4];
+	uint32_t reserved[4];
+};
+
 Error statusToError(uint8_t status);
 
 struct Interface {
@@ -44,6 +51,8 @@ struct Interface {
 	virtual async::result<frg::expected<Error, size_t>> sendScsiCommand(const CommandInfo &info) = 0;
 
 	async::result<frg::expected<Error, std::vector<uint64_t>>> reportLuns();
+	async::result<frg::expected<Error, std::vector<uint8_t>>> requestSense();
+	async::result<frg::expected<Error, CapabilityData>> readCapacity();
 
 	bool enableRead6{};
 };
