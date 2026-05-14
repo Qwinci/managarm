@@ -116,4 +116,44 @@ async::result<frg::expected<UsbError, size_t>> Endpoint::transfer(BulkTransfer i
 	return _state->transfer(info);
 }
 
+// ----------------------------------------------------------------------------
+// DeviceEndpoint
+// ----------------------------------------------------------------------------
+
+DeviceEndpoint::DeviceEndpoint(uint8_t number, PipeType type)
+: number_{number}, type_{type} { }
+
+async::result<frg::expected<UsbError>> DeviceEndpoint::enable(const EndpointDescriptor &descriptor,
+		std::optional<SsEndpointCompanionDescriptor> ssDescriptor) {
+	desc_ = descriptor;
+	ssDesc_ = ssDescriptor;
+
+	FRG_CO_TRY(co_await hwEnable_());
+	enabled_ = true;
+	co_return frg::success;
+}
+
+async::result<frg::expected<UsbError>> DeviceEndpoint::disable() {
+	FRG_CO_TRY(co_await hwDisable_());
+	enabled_ = false;
+	co_return frg::success;
+}
+
+// ----------------------------------------------------------------------------
+// DeviceController
+// ----------------------------------------------------------------------------
+
+async::result<frg::expected<UsbError>> DeviceController::start(DeviceGadget *gadget) {
+	boundGadget_ = gadget;
+	gadget->boundController_ = this;
+	co_return co_await hwStart_();
+}
+
+async::result<frg::expected<UsbError>> DeviceController::stop() {
+	FRG_CO_TRY(co_await hwStop_());
+	boundGadget_->boundController_ = nullptr;
+	boundGadget_ = nullptr;
+	co_return frg::success;
+}
+
 } // namespace protocols::usb

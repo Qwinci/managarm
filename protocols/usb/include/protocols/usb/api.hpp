@@ -1,9 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+#include <optional>
 
 #include <arch/dma_structs.hpp>
 #include <async/result.hpp>
+#include <async/generator.hpp>
 #include <frg/expected.hpp>
 
 #include "usb.hpp"
@@ -224,5 +227,116 @@ inline std::string getSpeedMbps(DeviceSpeed speed) {
 		}
 	}
 }
+
+struct DeviceController;
+
+// ----------------------------------------------------------------------------
+// DeviceGadget
+// ----------------------------------------------------------------------------
+
+struct DeviceGadget {
+	virtual ~DeviceGadget() = default;
+
+	virtual async::generator<frg::expected<UsbError, std::vector<std::byte> *>>
+	processSetupPacket(SetupPacket packet) = 0;
+
+	DeviceController *getController() {
+		return boundController_;
+	}
+
+private:
+	friend DeviceController;
+
+	DeviceController *boundController_{};
+};
+
+// ----------------------------------------------------------------------------
+// DeviceEndpoint
+// ----------------------------------------------------------------------------
+
+struct DeviceEndpoint {
+	DeviceEndpoint(uint8_t number, PipeType type);
+	virtual ~DeviceEndpoint() = default;
+
+	async::result<frg::expected<UsbError>> enable(const EndpointDescriptor &descriptor,
+			std::optional<SsEndpointCompanionDescriptor> ssDescriptor);
+	async::result<frg::expected<UsbError>> disable();
+
+	virtual async::result<frg::expected<UsbError>> setStall(bool stall) = 0;
+
+	virtual async::result<frg::expected<UsbError, size_t>> transfer(ControlTransfer info) = 0;
+	virtual async::result<frg::expected<UsbError, size_t>> transfer(InterruptTransfer info) = 0;
+	virtual async::result<frg::expected<UsbError, size_t>> transfer(BulkTransfer info) = 0;
+
+	const EndpointDescriptor &descriptor() const {
+		return desc_;
+	}
+
+	const std::optional<SsEndpointCompanionDescriptor> &ssDescriptor() const {
+		return ssDesc_;
+	}
+
+	uint8_t number() const {
+		return number_;
+	}
+
+	PipeType type() const {
+		return type_;
+	}
+
+	bool enabled() const {
+		return enabled_;
+	}
+
+protected:
+	virtual async::result<frg::expected<UsbError>> hwEnable_() = 0;
+	virtual async::result<frg::expected<UsbError>> hwDisable_() = 0;
+
+private:
+	EndpointDescriptor desc_{};
+	std::optional<SsEndpointCompanionDescriptor> ssDesc_{};
+	uint8_t number_{};
+	PipeType type_{};
+	bool enabled_{};
+};
+
+// ----------------------------------------------------------------------------
+// DeviceController
+// ----------------------------------------------------------------------------
+
+struct DeviceController {
+	virtual ~DeviceController() = default;
+
+	async::result<frg::expected<UsbError>> start(DeviceGadget *gadget);
+	async::result<frg::expected<UsbError>> stop();
+
+	size_t supportedEndpoints() const {
+		return eps_.size();
+	}
+
+	// EP0/EP1 CONTROL, EP2=IN, EP3=OUT, etc.
+	// OUT = host to device, IN = device to host
+	DeviceEndpoint *getEndpoint(uint8_t number) const {
+		if (number >= eps_.size())
+			return nullptr;
+		return eps_[number].get();
+	}
+
+	DeviceGadget *getGadget() const {
+		return boundGadget_;
+	}
+
+	DeviceSpeed getSpeed() const {
+		return speed_;
+	}
+
+protected:
+	virtual async::result<frg::expected<UsbError>> hwStart_() = 0;
+	virtual async::result<frg::expected<UsbError>> hwStop_() = 0;
+
+	std::vector<std::unique_ptr<DeviceEndpoint>> eps_;
+	DeviceGadget *boundGadget_{};
+	DeviceSpeed speed_{DeviceSpeed::superSpeed};
+};
 
 } // namespace protocols::usb

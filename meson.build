@@ -215,6 +215,7 @@ if build_drivers or provide_deps
 		'kbd', 'tty/virtio-console', 'uart',
 		# usb
 		'usb/hcds/uhci', 'usb/hcds/ehci', 'usb/hcds/xhci',
+		'usb/dcis/dwc3-xdci',
 		'usb/devices/hid', 'usb/devices/storage', 'usb/devices/serial',
 		# misc
 		'kernletcc'

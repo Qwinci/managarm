@@ -199,6 +199,11 @@ int main() {
 		execl("/usr/bin/runsvr", "/usr/bin/runsvr", "runsvr", "/usr/bin/xhci", nullptr);
 	}else assert(xhci != -1);
 
+	auto dwc3_xdci = fork();
+	if(!dwc3_xdci) {
+		execl("/usr/bin/runsvr", "/usr/bin/runsvr", "runsvr", "/usr/bin/dwc3-xdci", nullptr);
+	}else assert(dwc3_xdci != -1);
+
 	auto virtio = fork();
 	if(!virtio) {
 		execl("/usr/bin/runsvr", "/usr/bin/runsvr", "runsvr", "/usr/bin/virtio-block", nullptr);

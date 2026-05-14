@@ -74,6 +74,7 @@ namespace descriptor_type {
 		string = 0x03,
 		interface = 0x04,
 		endpoint = 0x05,
+		ssEndpointCompanion = 0x30,
 
 		// TODO: Put non-standard descriptors somewhere else.
 		hid = 0x21,
@@ -265,6 +266,12 @@ enum class EndpointType {
 	isochronous,
 	bulk,
 	interrupt
+};
+
+struct [[ gnu::packed ]] SsEndpointCompanionDescriptor : public DescriptorBase {
+	uint8_t maxBurst;
+	uint8_t attributes;
+	uint16_t bytesPerInterval;
 };
 
 template<typename F>

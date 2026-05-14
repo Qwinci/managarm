@@ -7,4 +7,6 @@ namespace protocols::usb {
 
 Device connect(helix::UniqueLane lane);
 
+std::unique_ptr<DeviceController> connectDeviceController(helix::UniqueLane lane);
+
 } // namespace protocols::usb

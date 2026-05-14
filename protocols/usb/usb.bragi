@@ -73,6 +73,30 @@ head(128):
 
 }
 
+message VerifySetupPacketRequest 7 {
+head(128):
+	uint8 type;
+	uint8 request;
+	uint16 value;
+	uint16 index;
+	uint16 length;
+}
+
+message VerifySetupPacketDataRequest 8 {
+head(128):
+	uint64 data_sent;
+tail:
+	byte[] data;
+}
+
+message StartDeviceControllerRequest 9 {
+head(128):
+}
+
+message StopDeviceControllerRequest 10 {
+head(128):
+}
+
 group {
 
 message SvrResponse 1 {
@@ -81,6 +105,29 @@ head(128):
 	tags {
 		tag(1) int64 size;
 	}
+}
+
+message VerifySetupPacketResponse 2 {
+head(128):
+	Errors error;
+	int8 has_data;
+tail:
+	byte[] data;
+}
+
+message VerifySetupPacketDataResponse 3 {
+head(128):
+	Errors error;
+}
+
+message StartDeviceControllerResponse 4 {
+head(128):
+	Errors error;
+}
+
+message StopDeviceControllerResponse 5 {
+head(128):
+	Errors error;
 }
 
 }
