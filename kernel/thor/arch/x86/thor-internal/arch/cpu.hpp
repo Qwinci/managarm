@@ -208,6 +208,8 @@ struct SyscallImageAccessor {
 
 	void *frameBase() { return _pointer + sizeof(Frame); }
 
+	Word ip() { return _frame()->rip; }
+
 private:
 	Frame *_frame() {
 		return reinterpret_cast<Frame *>(_pointer);

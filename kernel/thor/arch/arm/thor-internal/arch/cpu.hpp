@@ -93,6 +93,8 @@ struct SyscallImageAccessor {
 
 	void *frameBase() { return _pointer + sizeof(Frame); }
 
+	Word ip() { return _frame()->elr; }
+
 private:
 	friend struct FaultImageAccessor;
 

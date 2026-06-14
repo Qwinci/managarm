@@ -18,7 +18,7 @@
 
 enum {
 	// largest system call number plus 1
-	kHelNumCalls = 107,
+	kHelNumCalls = 109,
 
 	kHelCallLog = 1,
 	kHelCallPanic = 10,
@@ -107,6 +107,9 @@ enum {
 	kHelCallSetAffinity = 100,
 
 	kHelCallCreateToken = 104,
+
+	kHelCallInstallSyscallTrap = 107,
+	kHelCallUninstallSyscallTrap = 108,
 
 	kHelCallSuper = 0x80000000
 };
@@ -287,6 +290,7 @@ enum HelObservation {
 	kHelObserveGeneralFault = 5,
 	kHelObserveIllegalInstruction = 6,
 	kHelObserveDivByZero = 7,
+	kHelObserveSyscallTrap = 8,
 	kHelObserveSuperCall = 0x80000000
 };
 
@@ -1304,6 +1308,18 @@ HEL_C_LINKAGE HelError helEnableFullIo();
 //!     Handle to the bound kernlet.
 HEL_C_LINKAGE HelError helBindKernlet(HelHandle handle,
 		const union HelKernletData *data, size_t numData, HelHandle *boundHandle);
+
+//! Install a syscall trap to a thread.
+//! @param[in] universe_handle
+//!     Handle to the thread.
+//! @param[in] kernlet
+//!     Handle to an unbound kernlet.
+HEL_C_LINKAGE HelError helInstallSyscallTrap(HelHandle thread_handle, HelHandle kernlet);
+
+//! Uninstall a syscall trap from a thread.
+//! @param[in] universe_handle
+//!     Handle to the universe.
+HEL_C_LINKAGE HelError helUninstallSyscallTrap(HelHandle thread_handle);
 
 //! @}
 

@@ -44,6 +44,10 @@ struct BoundKernlet {
 		return _object.get();
 	}
 
+	smarter::shared_ptr<KernletObject> sharedObject() {
+		return _object;
+	}
+
 	const void *instanceStruct() {
 		return _instance;
 	}

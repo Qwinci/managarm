@@ -1796,6 +1796,10 @@ HelError helCreateThread(HelHandle universe_handle, HelHandle space_handle,
 
 	auto new_thread = Thread::create(std::move(universe), std::move(space), params);
 
+	// If the current thread has a syscall trap installed inherit it in the new thread.
+	if(auto syscallTrapKernlet = this_thread->getSyscallTrapKernlet())
+		new_thread->installSyscallTrap(std::move(syscallTrapKernlet));
+
 	// Adding a large prime (coprime to getCpuCount()) should yield a good distribution.
 	auto cpuIndex = globalNextCpu.fetch_add(4099, std::memory_order_relaxed) % getCpuCount();
 //	infoLogger() << "thor: New thread on CPU #" << cpu << frg::endlog;
@@ -1911,6 +1915,8 @@ HelError doSubmitObserve(HelHandle handle, smarter::shared_ptr<IpcQueue> queue,
 			helResult.observation = kHelObserveGeneralFault;
 		}else if(interrupt == kIntrIllegalInstruction) {
 			helResult.observation = kHelObserveIllegalInstruction;
+		}else if(interrupt == kIntrSyscallTrap) {
+			helResult.observation = kHelObserveSyscallTrap;
 		}else if(interrupt >= kIntrSuperCall) {
 			helResult.observation = kHelObserveSuperCall + (interrupt - kIntrSuperCall);
 		}else{
@@ -3771,6 +3777,57 @@ HelError helCreateToken(HelHandle *handle) {
 
 	*handle = thisUniverse->attachDescriptor(
 			TokenDescriptor(std::move(creds)));
+
+	return kHelErrNone;
+}
+
+HelError helInstallSyscallTrap(HelHandle thread_handle, HelHandle kernlet_handle) {
+	auto this_thread = getCurrentThread();
+	auto this_universe = this_thread->getUniverse();
+
+	auto threadOutcome = this_universe->inspectDescriptor(thread_handle,
+			[](AnyDescriptor &desc) -> std::expected<smarter::shared_ptr<Thread>, Error> {
+		if(!desc.is<ThreadDescriptor>())
+			return std::unexpected{Error::badDescriptor};
+		return smarter::rc_policy_downcast<smarter::default_rc_policy>(desc.get<ThreadDescriptor>().thread);
+	});
+	if(!threadOutcome)
+		return translateError(threadOutcome.error());
+	auto thread = std::move(*threadOutcome);
+
+	auto kernletOutcome = this_universe->inspectDescriptor(kernlet_handle,
+			[](AnyDescriptor &desc) -> std::expected<smarter::shared_ptr<KernletObject>, Error> {
+		if(!desc.is<KernletObjectDescriptor>())
+			return std::unexpected{Error::badDescriptor};
+		return desc.get<KernletObjectDescriptor>().kernletObject;
+	});
+	if(!kernletOutcome)
+		return translateError(kernletOutcome.error());
+	auto kernlet = std::move(*kernletOutcome);
+
+	if(kernlet->numberOfBindParameters() != 1 || kernlet->defnOfBindParameter(0).type != KernletParameterType::memoryView)
+		return kHelErrIllegalArgs;
+
+	thread->installSyscallTrap(std::move(kernlet));
+
+	return kHelErrNone;
+}
+
+HelError helUninstallSyscallTrap(HelHandle thread_handle) {
+	auto this_thread = getCurrentThread();
+	auto this_universe = this_thread->getUniverse();
+
+	auto threadOutcome = this_universe->inspectDescriptor(thread_handle,
+			[](AnyDescriptor &desc) -> std::expected<smarter::shared_ptr<Thread>, Error> {
+		if(!desc.is<ThreadDescriptor>())
+			return std::unexpected{Error::badDescriptor};
+		return smarter::rc_policy_downcast<smarter::default_rc_policy>(desc.get<ThreadDescriptor>().thread);
+	});
+	if(!threadOutcome)
+		return translateError(threadOutcome.error());
+	auto thread = std::move(*threadOutcome);
+
+	thread->uninstallSyscallTrap();
 
 	return kHelErrNone;
 }

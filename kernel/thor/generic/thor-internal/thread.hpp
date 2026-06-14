@@ -10,6 +10,7 @@
 #include <thor-internal/error.hpp>
 #include <thor-internal/schedule.hpp>
 #include <thor-internal/universe.hpp>
+#include <thor-internal/kernlet.hpp>
 #include <thor-internal/work-queue.hpp>
 
 namespace thor {
@@ -41,6 +42,7 @@ enum Interrupt {
 	kIntrPageFault,
 	kIntrGeneralFault,
 	kIntrIllegalInstruction,
+	kIntrSyscallTrap,
 	kIntrSuperCall = 0x80000000
 };
 
@@ -298,6 +300,11 @@ public:
 	smarter::borrowed_ptr<Universe> getUniverse();
 	smarter::borrowed_ptr<AddressSpace, BindableHandle> getAddressSpace();
 
+	void installSyscallTrap(smarter::shared_ptr<KernletObject> kernlet);
+	void uninstallSyscallTrap();
+	smarter::shared_ptr<KernletObject> getSyscallTrapKernlet();
+	bool shouldTrapSyscall(uintptr_t ip) const;
+
 	// ----------------------------------------------------------------------------------
 	// observe() and its boilerplate.
 	// ----------------------------------------------------------------------------------
@@ -516,6 +523,7 @@ public:
 private:
 	smarter::shared_ptr<Universe> _universe;
 	smarter::shared_ptr<AddressSpace, BindableHandle> _addressSpace;
+	smarter::shared_ptr<BoundKernlet> _syscallTrapKernlet;
 
 	using ObserveQueue = frg::intrusive_list<
 		ObserveNode,

@@ -408,5 +408,13 @@ extern inline __attribute__ (( always_inline )) HelError helCreateToken(HelHandl
 	return error;
 }
 
+extern inline __attribute__ (( always_inline )) HelError helInstallSyscallTrap(HelHandle thread_handle, HelHandle kernlet) {
+	return helSyscall2(kHelCallInstallSyscallTrap, (HelWord)thread_handle, (HelWord)kernlet);
+}
+
+extern inline __attribute__ (( always_inline )) HelError helUninstallSyscallTrap(HelHandle thread_handle) {
+	return helSyscall1(kHelCallUninstallSyscallTrap, (HelWord)thread_handle);
+}
+
 #endif // HEL_SYSCALLS_H
 

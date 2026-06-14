@@ -574,6 +574,12 @@ void handleSyscall(SyscallImageAccessor image) {
 				<< " syscall #" << *image.number() << frg::endlog;
 
 	// TODO: The return in this code path prevents us from checking for signals!
+	if(this_thread->shouldTrapSyscall(image.ip())) {
+		Thread::interruptCurrent(kIntrSyscallTrap, image, {});
+		return;
+	}
+
+	// TODO: The return in this code path prevents us from checking for signals!
 	if(*image.number() >= kHelCallSuper) {
 		Thread::interruptCurrent(static_cast<Interrupt>(kIntrSuperCall
 				+ (*image.number() - kHelCallSuper)), image, {});
@@ -858,6 +864,14 @@ void handleSyscall(SyscallImageAccessor image) {
 		HelHandle handle;
 		*image.error() = helCreateToken(&handle);
 		*image.out0() = handle;
+	} break;
+
+	case kHelCallInstallSyscallTrap: {
+		*image.error() = helInstallSyscallTrap((HelHandle)arg0, (HelHandle)arg1);
+	} break;
+
+	case kHelCallUninstallSyscallTrap: {
+		*image.error() = helUninstallSyscallTrap((HelHandle)arg0);
 	} break;
 
 	default:

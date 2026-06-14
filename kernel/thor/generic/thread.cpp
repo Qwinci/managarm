@@ -635,6 +635,31 @@ smarter::borrowed_ptr<AddressSpace, BindableHandle> Thread::getAddressSpace() {
 	return _addressSpace;
 }
 
+void Thread::installSyscallTrap(smarter::shared_ptr<KernletObject> kernlet) {
+	_syscallTrapKernlet = smarter::allocate_shared<BoundKernlet>(*kernelAlloc, std::move(kernlet));
+}
+
+void Thread::uninstallSyscallTrap() {
+	_syscallTrapKernlet = nullptr;
+}
+
+smarter::shared_ptr<KernletObject> Thread::getSyscallTrapKernlet() {
+	if(!_syscallTrapKernlet)
+		return nullptr;
+
+	return _syscallTrapKernlet->sharedObject();
+}
+
+bool Thread::shouldTrapSyscall(uintptr_t ip) const {
+	if(!_syscallTrapKernlet)
+		return false;
+
+	_syscallTrapKernlet->setupMemoryViewBinding(0, reinterpret_cast<void *>(ip));
+	int trapResult = _syscallTrapKernlet->invokeIrqAutomation();
+
+	return trapResult == 1;
+}
+
 void Thread::invoke() {
 	assert(!intsAreEnabled());
 	auto *cpuData = getCpuData();
